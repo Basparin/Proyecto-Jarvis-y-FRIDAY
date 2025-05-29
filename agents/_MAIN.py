@@ -12,20 +12,20 @@ from typing import Dict, List, Any, Optional
 
 # Importar agentes especializados
 try:
-    from autoprogrammer_agent import StarkAutoprogrammerAgent, activate_autoprogrammer_agent
-    from autoprogrammer_brain import AutoprogrammerBrain
-    from autoprogrammer_analyzer import AutoprogrammerAnalyzer
-    from autoprogrammer_converter import AutoprogrammerConverter
-    from autoprogrammer_creator import AutoprogrammerCreator
-    from autoprogrammer_optimizer import AutoprogrammerOptimizer
-    from autoprogrammer_reviewer import AutoprogrammerReviewer
-    from autoprogrammer_coordinator import AutoprogrammerCoordinator
+    from autoprogrammer_brain import StarkAutoprogrammerBrain
+    from autoprogrammer_analyzer import StarkAutoprogrammerAnalyzer
+    from autoprogrammer_converter import StarkAutoprogrammerConverter
+    from autoprogrammer_creator import StarkAutoprogrammerCreator
+    from autoprogrammer_optimizer import StarkAutoprogrammerOptimizer
+    from autoprogrammer_reviewer import StarkAutoprogrammerReviewer
+    from autoprogrammer_coordinator import StarkAutoprogrammerCoordinator
     from integrator_agent import IntegratorAgent
     from task_manager import TaskManager
+    AGENTS_AVAILABLE = True
 except ImportError as e:
     print(f"⚠️ Import warning: {e}")
     StarkAutoprogrammerAgent = None
-    activate_autoprogrammer_agent = None
+    AGENTS_AVAILABLE = False
 
 print("🤖 AGENTS MODULE - Iniciando coordinación...")
 

@@ -216,8 +216,7 @@ class StarkLauncher:
                 print("✅ Evolución continua activada (ciclos de 24h)")
                 
             elif evo_choice == '3':
-                print(evolution_engine.get_evolution_report())
-                
+                print(evolution_engine.get_evolution_report())                
             else:
                 print("❌ Evolución cancelada")
                 
@@ -237,7 +236,11 @@ class StarkLauncher:
                     break
                 elif choice in '123456':
                     category_list = list(self.categories.keys())
-                    self.execute_category(category_list[int(choice) - 1])
+                    category_index = int(choice) - 1
+                    if 0 <= category_index < len(category_list):
+                        self.execute_category(category_list[category_index])
+                    else:
+                        print(f"❌ Índice de categoría fuera de rango: {choice}")
                 elif choice == '7':
                     self.execute_all_modules()
                 elif choice == '8':
@@ -251,7 +254,7 @@ class StarkLauncher:
                 elif choice == '12':
                     await self.start_system_evolution()
                 else:
-                    print("❌ Opción no válida")
+                    print(f"❌ Opción '{choice}' no válida. Selecciona 0-12.")
                     
                 input("\nPresiona Enter para continuar...")
                 
@@ -265,7 +268,7 @@ def main():
     """Punto de entrada principal"""
     try:
         launcher = StarkLauncher()
-        asyncio.run(        asyncio.run(launcher.run()))
+        asyncio.run(launcher.run())
     except Exception as e:
         print(f"❌ Error crítico: {e}")
 

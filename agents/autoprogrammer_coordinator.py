@@ -132,7 +132,6 @@ class StarkAutoprogrammerCoordinator:
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
         return results
-    
     def generate_conversion_report(self, results: List[Dict[str, Any]]) -> str:
         """Genera reporte de resultados de conversión"""
         total = len(results)
@@ -207,45 +206,71 @@ Total procesados: {total}
             'new_capabilities': len(new_features),
             'timestamp': datetime.now().isoformat()
         }
-    
     async def _analyze_system_performance(self) -> Dict[str, Any]:
-        """Analiza rendimiento actual y detecta cuellos de botella"""
+        """Analiza rendimiento actual con métricas dinámicas reales"""
         print("📊 Analizando rendimiento del sistema...")
+        
+        import psutil
+        import time
+        import random
+        
+        # Métricas del sistema reales
+        cpu_percent = psutil.cpu_percent(interval=0.5)
+        memory = psutil.virtual_memory()
         
         # Análisis de archivos por velocidad de ejecución
         slow_components = []
         efficient_components = []
+        total_files = 0
+        total_size = 0
         
         workspace_path = os.path.join(os.path.dirname(__file__), '..')
         
         for root, dirs, files in os.walk(workspace_path):
             for file in files:
-                if file.endswith('.py'):
+                if file.endswith('.py') and '__pycache__' not in root:
                     file_path = os.path.join(root, file)
                     try:
+                        start_time = time.time()
                         with open(file_path, 'r', encoding='utf-8') as f:
                             content = f.read()
-                            
-                        # Detectar patrones de ineficiencia
+                        read_time = time.time() - start_time
+                        
+                        # Métricas del archivo
                         lines = len(content.split('\n'))
+                        file_size = len(content.encode('utf-8'))
                         complexity_score = self._calculate_complexity(content)
                         
-                        if complexity_score > 0.7:  # Alto umbral de complejidad
-                            slow_components.append({
-                                'file': file,
-                                'path': file_path,
-                                'complexity': complexity_score,
-                                'lines': lines
-                            })
+                        total_files += 1
+                        total_size += file_size
+                        
+                        component_data = {
+                            'file': file,
+                            'path': file_path,
+                            'complexity': round(complexity_score, 3),
+                            'lines': lines,
+                            'size_kb': round(file_size / 1024, 2),
+                            'read_time_ms': round(read_time * 1000, 2)
+                        }
+                        
+                        if complexity_score > 0.7 or read_time > 0.03:  # Componentes lentos
+                            slow_components.append(component_data)
                         else:
-                            efficient_components.append({
-                                'file': file,
-                                'complexity': complexity_score
-                            })
+                            efficient_components.append(component_data)
+                            
                     except Exception:
                         continue
         
+        # Calcular métricas dinámicas
+        avg_complexity = sum(c['complexity'] for c in slow_components + efficient_components) / max(total_files, 1)
+        
         return {
+            'cpu_usage_percent': round(cpu_percent, 1),
+            'memory_usage_percent': round(memory.percent, 1),
+            'memory_available_gb': round(memory.available / (1024**3), 2),
+            'total_project_files': total_files,
+            'total_project_size_mb': round(total_size / (1024**2), 2),
+            'average_complexity': round(avg_complexity, 3),
             'slow_components': slow_components,
             'efficient_components': efficient_components,
             'improvement_percentage': len(efficient_components) / (len(slow_components) + len(efficient_components)) * 100

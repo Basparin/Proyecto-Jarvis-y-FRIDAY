@@ -56,15 +56,18 @@ class AgentsMain:
     def _initialize_coordination(self):
         """Inicializa sistema de coordinación"""
         try:
-            # Crear coordinador de agentes
-            self.agent_coordinator = MockAgentCoordinator()
+            # Crear coordinador de agentes            self.agent_coordinator = MockAgentCoordinator()
             self.task_manager = MockTaskManager()
             self.decision_engine = MockDecisionEngine()
             
-            # Inicializar agente de autoprogramación
-            if activate_autoprogrammer_agent:
-                self.autoprogrammer_agent = activate_autoprogrammer_agent()
+            # Inicializar agente de autoprogramación (corregido)
+            try:
+                from autoprogrammer_agent import StarkAutoprogrammerAgent
+                self.autoprogrammer_agent = StarkAutoprogrammerAgent()
                 print("🤖 AUTOPROGRAMMER AGENT - Integrado al sistema")
+            except ImportError:
+                print("⚠️ Autoprogrammer agent no disponible")
+                self.autoprogrammer_agent = None
             
             self.coordination_active = True
             print("✅ AGENTS - Coordinación inicializada")

@@ -63,6 +63,7 @@ class StarkIntelligentOptimizer:
                 if opportunities:
                     optimization_results = await self._apply_intelligent_optimizations(opportunities)
                     self.optimization_history.append(optimization_results)
+                    await self._save_optimization_history(optimization_results)
                 
                 # Verificar mejoras
                 await self._verify_optimizations()
@@ -309,37 +310,90 @@ class StarkIntelligentOptimizer:
             verification_rate = improvements_verified / len(latest_optimization.get('optimizations_applied', [1])) * 100
             print(f"✅ Verificación completada: {verification_rate:.1f}% efectividad")
     
+    async def _save_optimization_history(self, optimization_record: Dict[str, Any]):
+        """Guarda el historial de optimizaciones"""
+        try:
+            history_file = "STARK_OPTIMIZATION_HISTORY.json"
+            
+            # Cargar historial existente
+            if os.path.exists(history_file):
+                with open(history_file, 'r', encoding='utf-8') as f:
+                    history = json.load(f)
+            else:
+                history = {'optimizations': [], 'total_sessions': 0}
+            
+            # Agregar nuevo registro
+            history['optimizations'].append(optimization_record)
+            history['total_sessions'] += 1
+            history['last_update'] = datetime.now().isoformat()
+            
+            # Mantener solo últimas 30 entradas
+            if len(history['optimizations']) > 30:
+                history['optimizations'] = history['optimizations'][-30:]
+            
+            # Guardar historial actualizado
+            with open(history_file, 'w', encoding='utf-8') as f:
+                json.dump(history, f, indent=2, ensure_ascii=False)
+                
+        except Exception as e:
+            print(f"⚠️ Error guardando historial de optimización: {e}")
+    
+    async def _load_optimization_history(self) -> Dict[str, Any]:
+        """Carga el historial de optimizaciones"""
+        try:
+            history_file = "STARK_OPTIMIZATION_HISTORY.json"
+            
+            if os.path.exists(history_file):
+                with open(history_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            
+            return {'optimizations': [], 'total_sessions': 0}
+            
+        except Exception as e:
+            print(f"⚠️ Error cargando historial de optimización: {e}")
+            return {'optimizations': [], 'total_sessions': 0}    
     def stop_optimization(self):
         """Detiene el proceso de optimización"""
         self.optimization_active = False
         print("🛑 Optimización inteligente detenida")
     
-    def get_optimization_report(self) -> str:
-        """Genera reporte de optimización"""
-        if not self.optimization_history:
+    async def get_optimization_report(self) -> str:
+        """Genera reporte de optimización con historial persistente"""
+        history = await self._load_optimization_history()
+        optimizations = history.get('optimizations', [])
+        
+        if not optimizations:
             return "📄 No hay historial de optimizaciones disponible"
         
+        recent_optimizations = optimizations[-3:]  # Últimas 3
         total_optimizations = sum(
-            len(opt.get('optimizations_applied', [])) for opt in self.optimization_history
+            len(opt.get('optimizations_applied', [])) for opt in optimizations
         )
         
-        latest = self.optimization_history[-1]
+        avg_performance_gain = sum(
+            opt.get('performance_improvement', 0) for opt in optimizations
+        ) / len(optimizations)
         
         report = f"""
 ⚡ STARK INTELLIGENT OPTIMIZER REPORT
 {'=' * 45}
-Total Ciclos: {len(self.optimization_history)}
+Total Sesiones: {history.get('total_sessions', 0)}
 Optimizaciones Aplicadas: {total_optimizations}
-Última Optimización: {latest.get('timestamp', 'N/A')}
+Ganancia Promedio: {avg_performance_gain:.1f}%
+Baseline: {len(self.performance_baseline)} métricas
 
-🎯 MÉTRICAS DE RENDIMIENTO:
-• Baseline establecido: {len(self.performance_baseline)} métricas
-• Optimización activa: {'✅ SÍ' if self.optimization_active else '❌ NO'}
-• Mejoras detectadas: {latest.get('opportunities_processed', 0)}
-
-📊 ÚLTIMA SESIÓN:
-{json.dumps(latest, indent=2, ensure_ascii=False)}
+📊 ÚLTIMAS 3 SESIONES:
 """
+        
+        for i, opt in enumerate(recent_optimizations, 1):
+            timestamp = opt.get('timestamp', '').split('T')[0]  # Solo fecha
+            report += f"""
+  {i}. {timestamp}
+     ⚡ Optimizaciones: {len(opt.get('optimizations_applied', []))}
+     📈 Mejora: {opt.get('performance_improvement', 0):.1f}%
+     🎯 Estado: {opt.get('status', 'unknown')}
+"""
+        
         return report
 
 if __name__ == "__main__":

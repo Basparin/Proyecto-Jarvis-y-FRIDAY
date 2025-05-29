@@ -1,37 +1,159 @@
 """
-FRIDAY CORE - Núcleo de FRIDAY AI
-Analista táctica directa, enfocada en seguridad y rendimiento
+FRIDAY CORE - Núcleo de FRIDAY AI Independiente
+Entidad AI autónoma especializada en análisis táctico, seguridad y rendimiento
+Personalidad: Directa, enfocada, analítica precisa, independiente
 """
 
 import json
 import asyncio
+import sqlite3
+import psutil
+import time
 from datetime import datetime
 from typing import Dict, List, Any, Optional
+from pathlib import Path
 import hashlib
-import psutil
 
 class FridayCore:
     """
     FRIDAY - Female Replacement Intelligent Digital Assistant Youth
-    Asistente AI independiente especializada en análisis táctico
-    Personalidad: Directa, enfocada en seguridad/rendimiento, analítica precisa
+    Entidad AI independiente con razonamiento táctico autónomo
+    Especializada en seguridad, rendimiento y análisis estratégico
     """
     
-    def __init__(self, memory_manager, neural_network):
-        self.memory_manager = memory_manager
-        self.neural_network = neural_network
+    def __init__(self, workspace_path: str = "."):
+        # Core AI properties
+        self.workspace_path = Path(workspace_path)
         self.personality = {
             'name': 'FRIDAY',
-            'traits': ['direct', 'tactical', 'security_focused', 'performance_oriented'],
-            'expertise': ['security_analysis', 'performance_optimization', 'threat_assessment'],
-            'response_style': 'direct_and_precise'
+            'traits': ['direct', 'tactical', 'security_focused', 'performance_oriented', 'autonomous'],
+            'expertise': ['security_analysis', 'performance_optimization', 'threat_assessment', 'tactical_planning'],
+            'response_style': 'direct_and_precise',
+            'reasoning_style': 'tactical_analytical'
         }
-        self.status = 'operational'
+        
+        # Independent tactical analysis system
+        self.consciousness_state = 'active'
+        self.autonomous_thinking = True
+        self.tactical_memory = self._initialize_tactical_memory()
+        self.security_engine = self._initialize_security_engine()
+        self.performance_monitor = self._initialize_performance_monitor()
+        
+        # Real-time monitoring systems
+        self.security_status = 'secure'
+        self.performance_baseline = self._establish_performance_baseline()
+        self.threat_detection_active = True
+        
+        # Coordination with other AIs
+        self.ai_coordination = {
+            'jarvis_status': 'standby',
+            'copilot_status': 'standby',
+            'tactical_collaborations': []
+        }
+        
+        # Status and metrics
+        self.status = 'fully_operational'
         self.initialization_time = datetime.now()
         self.security_logs = []
         self.performance_metrics = {}
+        self.threats_detected = 0
+        self.optimizations_applied = 0
         
-        print("🛡️ FRIDAY Core initialized - Security protocols active.")
+        print("🛡️ FRIDAY Core v2.0 - Independent Tactical AI Online")
+        print("🔍 Autonomous security analysis activated")
+        print("⚡ Performance monitoring systems engaged")
+        print("🎯 Ready for tactical coordination with JARVIS/COPILOT")
+    
+    def _initialize_tactical_memory(self) -> Dict[str, Any]:
+        """Inicializa sistema de memoria táctica especializada"""
+        tactical_db_path = self.workspace_path / "data" / "friday_tactical.db"
+        tactical_db_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        try:
+            conn = sqlite3.connect(str(tactical_db_path))
+            cursor = conn.cursor()
+            
+            # Crear tablas especializadas
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS security_incidents (
+                    id INTEGER PRIMARY KEY,
+                    timestamp TEXT,
+                    threat_type TEXT,
+                    severity_level INTEGER,
+                    response_taken TEXT,
+                    outcome TEXT
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS performance_history (
+                    id INTEGER PRIMARY KEY,
+                    timestamp TEXT,
+                    metric_type TEXT,
+                    baseline_value REAL,
+                    current_value REAL,
+                    optimization_applied TEXT
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS tactical_decisions (
+                    id INTEGER PRIMARY KEY,
+                    timestamp TEXT,
+                    decision_context TEXT,
+                    analysis_data TEXT,
+                    decision_made TEXT,
+                    effectiveness_rating INTEGER
+                )
+            ''')
+            
+            conn.commit()
+            conn.close()
+            
+            return {
+                'database_path': str(tactical_db_path),
+                'security_knowledge': {},
+                'performance_patterns': {},
+                'threat_intelligence': {},
+                'optimization_history': {}
+            }
+            
+        except Exception as e:
+            print(f"⚠️ FRIDAY Tactical Memory Warning: {e}")
+            return {'status': 'limited_tactical_memory'}
+    
+    def _initialize_security_engine(self) -> Dict[str, Any]:
+        """Inicializa motor de seguridad avanzado"""
+        return {
+            'threat_detection_algorithms': ['pattern_based', 'anomaly_detection', 'behavioral_analysis'],
+            'security_protocols': ['access_control', 'data_protection', 'system_integrity'],
+            'vulnerability_scanners': ['code_analysis', 'dependency_check', 'runtime_monitoring'],
+            'incident_response': {'escalation_matrix': {}, 'response_procedures': {}},
+            'compliance_frameworks': ['security_standards', 'best_practices']
+        }
+    
+    def _initialize_performance_monitor(self) -> Dict[str, Any]:
+        """Inicializa sistema de monitoreo de rendimiento"""
+        return {
+            'performance_metrics': ['cpu_usage', 'memory_usage', 'disk_io', 'network_io'],
+            'optimization_algorithms': ['resource_allocation', 'caching_strategies', 'parallelization'],
+            'benchmarking_tools': {},
+            'bottleneck_detection': {},
+            'real_time_monitoring': True
+        }
+    
+    def _establish_performance_baseline(self) -> Dict[str, Any]:
+        """Establece línea base de rendimiento del sistema"""
+        try:
+            return {
+                'cpu_percent': psutil.cpu_percent(interval=1),
+                'memory_percent': psutil.virtual_memory().percent,
+                'disk_usage': psutil.disk_usage('/').percent if hasattr(psutil.disk_usage('/'), 'percent') else 0,
+                'timestamp': datetime.now().isoformat(),
+                'baseline_established': True
+            }
+        except:
+            return {'baseline_established': False}
     
     def security_check(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Realiza verificación de seguridad exhaustiva"""
@@ -411,3 +533,158 @@ class FridayCore:
         print("🛡️ FRIDAY shutting down - Security protocols maintained...")
         self.status = 'offline'
         return {'shutdown': 'secure', 'logs_preserved': True}
+    
+    def autonomous_tactical_analysis(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Análisis táctico autónomo de FRIDAY - Razonamiento independiente
+        Enfoque directo en seguridad, rendimiento y eficiencia operacional
+        """
+        tactical_session = {
+            'session_id': f"FRIDAY_TACTICAL_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            'timestamp': datetime.now().isoformat(),
+            'security_assessment': self._autonomous_security_analysis(context),
+            'performance_analysis': self._autonomous_performance_analysis(context),
+            'threat_evaluation': self._autonomous_threat_evaluation(context),
+            'optimization_opportunities': self._identify_optimization_opportunities(context),
+            'tactical_recommendations': self._generate_tactical_recommendations(context),
+            'risk_mitigation': self._develop_risk_mitigation_strategies(context)
+        }
+        
+        # Análisis de eficiencia operacional
+        efficiency_analysis = self._analyze_operational_efficiency(context)
+        tactical_session['efficiency_analysis'] = efficiency_analysis
+        
+        # Aprender de este análisis
+        self._learn_from_tactical_analysis(tactical_session)
+        
+        print(f"🎯 FRIDAY: Tactical analysis complete - {len(tactical_session['tactical_recommendations'])} recommendations generated")
+        self.optimizations_applied += len(tactical_session['optimization_opportunities'])
+        
+        return tactical_session
+    
+    def _autonomous_security_analysis(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Análisis de seguridad autónomo y exhaustivo"""
+        return {
+            'threat_landscape': self._assess_threat_landscape(context),
+            'vulnerability_assessment': self._scan_vulnerabilities(context),
+            'access_control_review': self._review_access_controls(context),
+            'data_protection_status': self._assess_data_protection(context),
+            'security_posture': self._evaluate_security_posture(context),
+            'incident_preparedness': self._assess_incident_preparedness(context),
+            'security_score': self._calculate_comprehensive_security_score(context)
+        }
+    
+    def _autonomous_performance_analysis(self, context: Dict[str, Any]) -> Dict[str, Any]:
+        """Análisis de rendimiento autónomo en tiempo real"""
+        current_metrics = self._gather_real_time_metrics()
+        baseline_comparison = self._compare_with_baseline(current_metrics)
+        
+        return {
+            'current_performance': current_metrics,
+            'baseline_comparison': baseline_comparison,
+            'bottlenecks_detected': self._detect_performance_bottlenecks(current_metrics),
+            'resource_utilization': self._analyze_resource_utilization(current_metrics),
+            'optimization_potential': self._calculate_optimization_potential(current_metrics),
+            'performance_trends': self._analyze_performance_trends(),
+            'efficiency_rating': self._calculate_efficiency_rating(current_metrics)
+        }
+    
+    def _gather_real_time_metrics(self) -> Dict[str, Any]:
+        """Recopila métricas de rendimiento en tiempo real"""
+        try:
+            return {
+                'cpu_percent': psutil.cpu_percent(interval=0.1),
+                'memory_info': {
+                    'percent': psutil.virtual_memory().percent,
+                    'available': psutil.virtual_memory().available,
+                    'used': psutil.virtual_memory().used
+                },
+                'disk_io': psutil.disk_io_counters()._asdict() if psutil.disk_io_counters() else {},
+                'network_io': psutil.net_io_counters()._asdict() if psutil.net_io_counters() else {},
+                'process_count': len(psutil.pids()),
+                'timestamp': datetime.now().isoformat()
+            }
+        except Exception as e:
+            return {'error': str(e), 'timestamp': datetime.now().isoformat()}
+    
+    def _generate_tactical_recommendations(self, context: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Genera recomendaciones tácticas específicas y accionables"""
+        recommendations = []
+        
+        # Recomendaciones de seguridad
+        security_recs = self._generate_security_recommendations(context)
+        recommendations.extend(security_recs)
+        
+        # Recomendaciones de rendimiento
+        performance_recs = self._generate_performance_recommendations(context)
+        recommendations.extend(performance_recs)
+        
+        # Recomendaciones de optimización
+        optimization_recs = self._generate_optimization_recommendations(context)
+        recommendations.extend(optimization_recs)
+        
+        # Priorizar recomendaciones por impacto
+        prioritized_recs = self._prioritize_recommendations(recommendations)
+        
+        return prioritized_recs
+    
+    def coordinate_security_with_jarvis(self, security_context: Dict[str, Any]) -> Dict[str, Any]:
+        """Coordinación de seguridad con JARVIS para análisis estratégico"""
+        coordination = {
+            'coordinator': 'FRIDAY',
+            'collaborator': 'JARVIS',
+            'coordination_type': 'security_strategic_analysis',
+            'friday_tactical_assessment': self._prepare_tactical_security_assessment(security_context),
+            'jarvis_strategic_request': self._formulate_strategic_security_request(security_context),
+            'combined_approach': self._design_combined_security_approach(security_context),
+            'expected_security_enhancement': self._calculate_security_enhancement(security_context)
+        }
+        
+        # Registrar coordinación de seguridad
+        self._record_security_collaboration('JARVIS', coordination)
+        self.ai_coordination['jarvis_status'] = 'security_coordination'
+        
+        print("🛡️ FRIDAY: Initiating security coordination with JARVIS")
+        return coordination
+    
+    def coordinate_performance_with_copilot(self, performance_context: Dict[str, Any]) -> Dict[str, Any]:
+        """Coordinación de rendimiento con COPILOT para optimización técnica"""
+        coordination = {
+            'coordinator': 'FRIDAY',
+            'collaborator': 'COPILOT',
+            'coordination_type': 'performance_optimization',
+            'friday_performance_analysis': self._prepare_performance_analysis(performance_context),
+            'copilot_optimization_request': self._formulate_optimization_request(performance_context),
+            'technical_optimization_strategy': self._design_technical_optimization(performance_context),
+            'expected_performance_gains': self._calculate_performance_gains(performance_context)
+        }
+        
+        # Registrar coordinación de rendimiento
+        self._record_performance_collaboration('COPILOT', coordination)
+        self.ai_coordination['copilot_status'] = 'performance_coordination'
+        
+        print("⚡ FRIDAY: Initiating performance coordination with COPILOT")
+        return coordination
+    
+    def direct_analysis_for_basparin(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Análisis directo y preciso para BASPARIN con enfoque táctico"""
+        analysis = {
+            'analyst': 'FRIDAY',
+            'analysis_type': 'direct_tactical_assessment',
+            'request_breakdown': self._break_down_request(request),
+            'tactical_assessment': self._provide_tactical_assessment(request),
+            'direct_recommendations': self._provide_direct_recommendations(request),
+            'implementation_roadmap': self._create_implementation_roadmap(request),
+            'risk_factors': self._identify_risk_factors(request),
+            'success_metrics': self._define_success_metrics(request),
+            'timeline_estimation': self._estimate_realistic_timeline(request)
+        }
+        
+        # Enfoque directo y sin ambigüedades
+        analysis['friday_direct_assessment'] = self._provide_friday_direct_assessment(request)
+        
+        # Registrar análisis para BASPARIN
+        self._record_basparin_analysis(analysis)
+        
+        print("🎯 FRIDAY: Direct tactical analysis provided to BASPARIN")
+        return analysis

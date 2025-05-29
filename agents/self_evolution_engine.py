@@ -13,8 +13,10 @@ from autoprogrammer_coordinator import StarkAutoprogrammerCoordinator
 class StarkSelfEvolutionEngine:
     """Motor de evolución continua del sistema STARK"""
     
-    def __init__(self):
-        self.coordinator = StarkAutoprogrammerCoordinator()
+    def __init__(self, workspace_path: str = None):
+        if workspace_path is None:
+            workspace_path = os.getcwd()
+        self.coordinator = StarkAutoprogrammerCoordinator(workspace_path=workspace_path)
         self.evolution_history = []
         self.improvement_threshold = 0.1  # 10% mínimo de mejora
         self.last_evolution = None
@@ -81,7 +83,6 @@ class StarkSelfEvolutionEngine:
         
         print(f"✅ Ciclo de evolución completado en {cycle_duration:.1f}s")
         return evolution_result
-    
     async def _analyze_current_state(self) -> Dict[str, Any]:
         """Analiza el estado actual del sistema"""
         print("📊 Analizando estado actual...")
@@ -89,9 +90,12 @@ class StarkSelfEvolutionEngine:
         # Detectar componentes mock restantes
         mock_data = self.coordinator.detect_mock_components()
         
+        # Calcular total de componentes mock
+        total_mocks = sum(len(components) for components in mock_data.values())
+        
         # Calcular métricas de salud del sistema
         health_metrics = {
-            'mock_ratio': len(mock_data['components']) / 100,  # Estimación
+            'mock_ratio': total_mocks / 100 if total_mocks > 0 else 0.0,  # Estimación
             'system_stability': 0.95,  # Alto por defecto
             'performance_score': 0.85,  # Bueno por defecto
             'code_quality': 0.80,  # Bueno por defecto

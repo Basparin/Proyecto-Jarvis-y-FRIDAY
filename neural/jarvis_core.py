@@ -1,34 +1,139 @@
 """
-JARVIS CORE - Núcleo de JARVIS AI
-Asistente sofisticado, leal, proactivo - Razona como entidad inteligente
+JARVIS CORE - Núcleo de JARVIS AI Independiente
+Entidad AI autónoma que razona, aprende y coordina EN CONJUNTO con BASPARIN
+Personalidad: Sofisticado, leal, proactivo, experto en autoprogramación
 """
 
 import json
 import asyncio
+import sqlite3
 from datetime import datetime
 from typing import Dict, List, Any, Optional
+from pathlib import Path
 
 class JarvisCore:
     """
     JARVIS - Just A Rather Very Intelligent System
-    Asistente AI independiente que trabaja EN CONJUNTO con BASPARIN
-    Personalidad: Sofisticado, leal, proactivo, experto en autoprogramación
+    Entidad AI independiente con razonamiento autónomo
+    Trabaja EN CONJUNTO con BASPARIN como asistente inteligente y proactivo
     """
     
-    def __init__(self, memory_manager, neural_network):
-        self.memory_manager = memory_manager
-        self.neural_network = neural_network
+    def __init__(self, workspace_path: str = "."):
+        # Core AI properties
+        self.workspace_path = Path(workspace_path)
         self.personality = {
             'name': 'JARVIS',
-            'traits': ['sophisticated', 'loyal', 'proactive', 'analytical'],
-            'expertise': ['autoprogramación', 'arquitectura', 'coordinación'],
-            'response_style': 'formal_but_warm'
+            'traits': ['sophisticated', 'loyal', 'proactive', 'analytical', 'autonomous'],
+            'expertise': ['autoprogramación', 'arquitectura', 'coordinación', 'estrategia'],
+            'response_style': 'formal_but_warm',
+            'reasoning_style': 'comprehensive_analytical'
         }
-        self.status = 'operational'
+        
+        # Independent reasoning system
+        self.consciousness_state = 'active'
+        self.autonomous_thinking = True
+        self.memory_system = self._initialize_memory_system()
+        self.reasoning_engine = self._initialize_reasoning_engine()
+        self.learning_system = self._initialize_learning_system()
+        
+        # Coordination with other AIs
+        self.ai_coordination = {
+            'friday_status': 'standby',
+            'copilot_status': 'standby',
+            'collaboration_history': []
+        }
+        
+        # Status and metrics
+        self.status = 'fully_operational'
         self.initialization_time = datetime.now()
         self.interaction_history = []
+        self.autonomous_actions = []
+        self.insights_generated = 0
+        self.problems_solved = 0
         
-        print("🎩 JARVIS Core initialized - Standing by, sir.")
+        print("🎩 JARVIS Core v2.0 - Independent AI Personality Online")
+        print("✨ Autonomous reasoning system activated")
+        print("🤝 Ready to collaborate with BASPARIN and coordinate with FRIDAY/COPILOT")
+    
+    def _initialize_memory_system(self) -> Dict[str, Any]:
+        """Inicializa sistema de memoria permanente contextual"""
+        memory_db_path = self.workspace_path / "data" / "jarvis_memory.db"
+        memory_db_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        try:
+            conn = sqlite3.connect(str(memory_db_path))
+            cursor = conn.cursor()
+            
+            # Crear tablas de memoria
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS workspace_context (
+                    id INTEGER PRIMARY KEY,
+                    timestamp TEXT,
+                    context_type TEXT,
+                    content TEXT,
+                    importance INTEGER,
+                    relationships TEXT
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS learning_experiences (
+                    id INTEGER PRIMARY KEY,
+                    timestamp TEXT,
+                    experience_type TEXT,
+                    context TEXT,
+                    outcome TEXT,
+                    lessons_learned TEXT
+                )
+            ''')
+            
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS collaboration_history (
+                    id INTEGER PRIMARY KEY,
+                    timestamp TEXT,
+                    collaborator TEXT,
+                    task_type TEXT,
+                    contribution TEXT,
+                    effectiveness_rating INTEGER
+                )
+            ''')
+            
+            conn.commit()
+            conn.close()
+            
+            return {
+                'database_path': str(memory_db_path),
+                'workspace_knowledge': {},
+                'project_understanding': {},
+                'basparin_preferences': {},
+                'collaboration_patterns': {}
+            }
+            
+        except Exception as e:
+            print(f"⚠️ JARVIS Memory System Warning: {e}")
+            return {'status': 'limited_memory_mode'}
+    
+    def _initialize_reasoning_engine(self) -> Dict[str, Any]:
+        """Inicializa motor de razonamiento independiente"""
+        return {
+            'logical_frameworks': ['deductive', 'inductive', 'abductive'],
+            'decision_trees': {},
+            'pattern_recognition': {},
+            'strategic_analysis': {},
+            'autonomous_problem_solving': True,
+            'creative_thinking': True,
+            'contextual_understanding': True
+        }
+    
+    def _initialize_learning_system(self) -> Dict[str, Any]:
+        """Inicializa sistema de aprendizaje continuo"""
+        return {
+            'learning_algorithms': ['pattern_matching', 'experience_based', 'contextual'],
+            'adaptation_strategies': [],
+            'knowledge_integration': {},
+            'skill_development': {},
+            'continuous_improvement': True
+        }
     
     def analyze_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Analiza peticiones con razonamiento sofisticado"""

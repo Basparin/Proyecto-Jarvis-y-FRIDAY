@@ -1,0 +1,544 @@
+"""
+STARK INDUSTRIES - Vision System
+Sistema de visión por computadora real para el módulo de percepción
+Implementación completa con OpenCV y detección de objetos
+"""
+
+import cv2
+import numpy as np
+import threading
+import time
+from typing import Dict, List, Any, Optional, Tuple, Callable
+from datetime import datetime
+import logging
+import json
+import os
+from dataclasses import dataclass
+from abc import ABC, abstractmethod
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+@dataclass
+class DetectedObject:
+    """Representa un objeto detectado"""
+    object_id: str
+    class_name: str
+    confidence: float
+    bounding_box: Tuple[int, int, int, int]  # (x, y, width, height)
+    center: Tuple[int, int]
+    timestamp: datetime
+    properties: Dict[str, Any]
+
+@dataclass
+class VisionFrame:
+    """Representa un frame procesado"""
+    frame_id: str
+    timestamp: datetime
+    resolution: Tuple[int, int]
+    detected_objects: List[DetectedObject]
+    frame_data: np.ndarray
+    processing_time: float
+
+class VisionProcessor(ABC):
+    """Procesador abstracto de visión"""
+    
+    @abstractmethod
+    def process_frame(self, frame: np.ndarray) -> List[DetectedObject]:
+        pass
+    
+    @abstractmethod
+    def get_processor_info(self) -> Dict[str, Any]:
+        pass
+
+class OpenCVProcessor(VisionProcessor):
+    """Procesador basado en OpenCV"""
+    
+    def __init__(self):
+        self.name = "OpenCV_Processor"
+        self.cascade_classifiers = {}
+        self._load_classifiers()
+        
+        # Configuración de detección
+        self.detection_config = {
+            "scale_factor": 1.1,
+            "min_neighbors": 5,
+            "min_size": (30, 30),
+            "confidence_threshold": 0.5
+        }
+        
+        logger.info("🔍 OpenCV Processor inicializado")
+    
+    def _load_classifiers(self):
+        """Carga clasificadores Haar cascade"""
+        try:
+            # Intentar cargar clasificadores comunes
+            cascades = {
+                "face": "haarcascade_frontalface_default.xml",
+                "eye": "haarcascade_eye.xml",
+                "smile": "haarcascade_smile.xml"
+            }
+            
+            for name, filename in cascades.items():
+                try:
+                    classifier_path = cv2.data.haarcascades + filename
+                    classifier = cv2.CascadeClassifier(classifier_path)
+                    if not classifier.empty():
+                        self.cascade_classifiers[name] = classifier
+                        logger.info(f"Clasificador {name} cargado")
+                except Exception as e:
+                    logger.warning(f"No se pudo cargar {name}: {e}")
+                    
+        except Exception as e:
+            logger.error(f"Error cargando clasificadores: {e}")
+    
+    def process_frame(self, frame: np.ndarray) -> List[DetectedObject]:
+        """Procesa un frame con OpenCV"""
+        detected_objects = []
+        
+        if frame is None or frame.size == 0:
+            return detected_objects
+        
+        # Convertir a escala de grises para procesamiento
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        
+        # Detectar con cada clasificador
+        for class_name, classifier in self.cascade_classifiers.items():
+            try:
+                detections = classifier.detectMultiScale(
+                    gray,
+                    scaleFactor=self.detection_config["scale_factor"],
+                    minNeighbors=self.detection_config["min_neighbors"],
+                    minSize=self.detection_config["min_size"]
+                )
+                
+                for i, (x, y, w, h) in enumerate(detections):
+                    obj_id = f"{class_name}_{i}_{int(time.time())}"
+                    center = (x + w // 2, y + h // 2)
+                    
+                    detected_obj = DetectedObject(
+                        object_id=obj_id,
+                        class_name=class_name,
+                        confidence=0.8,  # Confidence estimada para Haar cascades
+                        bounding_box=(x, y, w, h),
+                        center=center,
+                        timestamp=datetime.now(),
+                        properties={"detector": "opencv_haar"}
+                    )
+                    
+                    detected_objects.append(detected_obj)
+                    
+            except Exception as e:
+                logger.error(f"Error detectando {class_name}: {e}")
+        
+        return detected_objects
+    
+    def get_processor_info(self) -> Dict[str, Any]:
+        """Información del procesador"""
+        return {
+            "name": self.name,
+            "classifiers_loaded": list(self.cascade_classifiers.keys()),
+            "detection_config": self.detection_config,
+            "opencv_version": cv2.__version__
+        }
+
+class MotionDetector(VisionProcessor):
+    """Detector de movimiento"""
+    
+    def __init__(self):
+        self.name = "Motion_Detector"
+        self.background_subtractor = cv2.createBackgroundSubtractorMOG2(
+            detectShadows=True
+        )
+        self.motion_threshold = 500
+        self.min_contour_area = 100
+        
+        logger.info("🏃 Motion Detector inicializado")
+    
+    def process_frame(self, frame: np.ndarray) -> List[DetectedObject]:
+        """Detecta movimiento en el frame"""
+        detected_objects = []
+        
+        if frame is None or frame.size == 0:
+            return detected_objects
+        
+        try:
+            # Aplicar sustractor de fondo
+            fg_mask = self.background_subtractor.apply(frame)
+            
+            # Encontrar contornos
+            contours, _ = cv2.findContours(
+                fg_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+            )
+            
+            for i, contour in enumerate(contours):
+                area = cv2.contourArea(contour)
+                
+                if area > self.min_contour_area:
+                    # Obtener bounding rectangle
+                    x, y, w, h = cv2.boundingRect(contour)
+                    center = (x + w // 2, y + h // 2)
+                    
+                    # Calcular confidence basada en el área
+                    confidence = min(1.0, area / self.motion_threshold)
+                    
+                    obj_id = f"motion_{i}_{int(time.time())}"
+                    
+                    detected_obj = DetectedObject(
+                        object_id=obj_id,
+                        class_name="motion",
+                        confidence=confidence,
+                        bounding_box=(x, y, w, h),
+                        center=center,
+                        timestamp=datetime.now(),
+                        properties={"area": area, "detector": "motion"}
+                    )
+                    
+                    detected_objects.append(detected_obj)
+                    
+        except Exception as e:
+            logger.error(f"Error en detección de movimiento: {e}")
+        
+        return detected_objects
+    
+    def get_processor_info(self) -> Dict[str, Any]:
+        """Información del detector de movimiento"""
+        return {
+            "name": self.name,
+            "motion_threshold": self.motion_threshold,
+            "min_contour_area": self.min_contour_area,
+            "background_model": "MOG2"
+        }
+
+class ColorDetector(VisionProcessor):
+    """Detector de colores específicos"""
+    
+    def __init__(self):
+        self.name = "Color_Detector"
+        self.color_ranges = {
+            "red": [(0, 50, 50), (10, 255, 255)],
+            "blue": [(100, 50, 50), (130, 255, 255)],
+            "green": [(40, 50, 50), (80, 255, 255)],
+            "yellow": [(20, 50, 50), (30, 255, 255)]
+        }
+        
+        logger.info("🎨 Color Detector inicializado")
+    
+    def process_frame(self, frame: np.ndarray) -> List[DetectedObject]:
+        """Detecta colores específicos en el frame"""
+        detected_objects = []
+        
+        if frame is None or frame.size == 0:
+            return detected_objects
+        
+        try:
+            # Convertir a HSV para mejor detección de color
+            hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+            
+            for color_name, (lower, upper) in self.color_ranges.items():
+                # Crear máscara para el color
+                lower_bound = np.array(lower)
+                upper_bound = np.array(upper)
+                mask = cv2.inRange(hsv, lower_bound, upper_bound)
+                
+                # Encontrar contornos
+                contours, _ = cv2.findContours(
+                    mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+                )
+                
+                for i, contour in enumerate(contours):
+                    area = cv2.contourArea(contour)
+                    
+                    if area > 300:  # Filtrar áreas pequeñas
+                        x, y, w, h = cv2.boundingRect(contour)
+                        center = (x + w // 2, y + h // 2)
+                        
+                        # Confidence basada en el área
+                        confidence = min(1.0, area / 5000)
+                        
+                        obj_id = f"{color_name}_{i}_{int(time.time())}"
+                        
+                        detected_obj = DetectedObject(
+                            object_id=obj_id,
+                            class_name=f"color_{color_name}",
+                            confidence=confidence,
+                            bounding_box=(x, y, w, h),
+                            center=center,
+                            timestamp=datetime.now(),
+                            properties={
+                                "color": color_name,
+                                "area": area,
+                                "detector": "color"
+                            }
+                        )
+                        
+                        detected_objects.append(detected_obj)
+                        
+        except Exception as e:
+            logger.error(f"Error en detección de colores: {e}")
+        
+        return detected_objects
+    
+    def get_processor_info(self) -> Dict[str, Any]:
+        """Información del detector de colores"""
+        return {
+            "name": self.name,
+            "supported_colors": list(self.color_ranges.keys()),
+            "color_space": "HSV"
+        }
+
+class StarkVisionSystem:
+    """
+    Sistema de visión principal de STARK Industries
+    Coordina múltiples procesadores de visión
+    """
+    
+    def __init__(self, camera_index: int = 0):
+        self.camera_index = camera_index
+        self.camera = None
+        self.active = False
+        self.processing_thread = None
+        self.frame_rate = 30
+        
+        # Procesadores disponibles
+        self.processors = {
+            "opencv": OpenCVProcessor(),
+            "motion": MotionDetector(),
+            "color": ColorDetector()
+        }
+        
+        self.enabled_processors = ["opencv", "motion", "color"]
+        
+        # Estado y resultados
+        self.current_frame = None
+        self.last_detection_results = []
+        self.processing_stats = {
+            "frames_processed": 0,
+            "total_objects_detected": 0,
+            "average_processing_time": 0.0,
+            "last_update": datetime.now()
+        }
+        
+        # Callbacks para eventos
+        self.detection_callbacks: List[Callable] = []
+        
+        logger.info("👁️ STARK Vision System inicializado")
+    
+    def initialize_camera(self) -> bool:
+        """Inicializa la cámara"""
+        try:
+            self.camera = cv2.VideoCapture(self.camera_index)
+            
+            if not self.camera.isOpened():
+                logger.error("No se pudo abrir la cámara")
+                return False
+            
+            # Configurar propiedades de la cámara
+            self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+            self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+            self.camera.set(cv2.CAP_PROP_FPS, self.frame_rate)
+            
+            logger.info("📹 Cámara inicializada correctamente")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error inicializando cámara: {e}")
+            return False
+    
+    def start_processing(self) -> bool:
+        """Inicia el procesamiento de video"""
+        if not self.initialize_camera():
+            return False
+        
+        self.active = True
+        self.processing_thread = threading.Thread(target=self._processing_loop)
+        self.processing_thread.daemon = True
+        self.processing_thread.start()
+        
+        logger.info("🚀 Procesamiento de visión iniciado")
+        return True
+    
+    def stop_processing(self):
+        """Detiene el procesamiento de video"""
+        self.active = False
+        
+        if self.processing_thread:
+            self.processing_thread.join(timeout=2.0)
+        
+        if self.camera:
+            self.camera.release()
+        
+        logger.info("⏹️ Procesamiento de visión detenido")
+    
+    def _processing_loop(self):
+        """Bucle principal de procesamiento"""
+        frame_time = 1.0 / self.frame_rate
+        
+        while self.active:
+            try:
+                start_time = time.time()
+                
+                # Capturar frame
+                ret, frame = self.camera.read()
+                if not ret:
+                    continue
+                
+                self.current_frame = frame.copy()
+                
+                # Procesar con todos los procesadores habilitados
+                all_detections = []
+                
+                for processor_name in self.enabled_processors:
+                    if processor_name in self.processors:
+                        processor = self.processors[processor_name]
+                        detections = processor.process_frame(frame)
+                        all_detections.extend(detections)
+                
+                # Actualizar resultados
+                self.last_detection_results = all_detections
+                
+                # Ejecutar callbacks
+                for callback in self.detection_callbacks:
+                    try:
+                        callback(all_detections, frame)
+                    except Exception as e:
+                        logger.error(f"Error en callback: {e}")
+                
+                # Actualizar estadísticas
+                processing_time = time.time() - start_time
+                self._update_stats(processing_time, len(all_detections))
+                
+                # Control de frame rate
+                sleep_time = max(0, frame_time - processing_time)
+                time.sleep(sleep_time)
+                
+            except Exception as e:
+                logger.error(f"Error en bucle de procesamiento: {e}")
+                time.sleep(0.1)
+    
+    def _update_stats(self, processing_time: float, objects_detected: int):
+        """Actualiza estadísticas de procesamiento"""
+        self.processing_stats["frames_processed"] += 1
+        self.processing_stats["total_objects_detected"] += objects_detected
+        
+        # Promedio móvil del tiempo de procesamiento
+        if self.processing_stats["average_processing_time"] == 0.0:
+            self.processing_stats["average_processing_time"] = processing_time
+        else:
+            alpha = 0.1  # Factor de suavizado
+            self.processing_stats["average_processing_time"] = (
+                alpha * processing_time + 
+                (1 - alpha) * self.processing_stats["average_processing_time"]
+            )
+        
+        self.processing_stats["last_update"] = datetime.now()
+    
+    def get_current_frame(self) -> Optional[np.ndarray]:
+        """Obtiene el frame actual"""
+        return self.current_frame.copy() if self.current_frame is not None else None
+    
+    def get_detections(self) -> List[DetectedObject]:
+        """Obtiene las últimas detecciones"""
+        return self.last_detection_results.copy()
+    
+    def add_detection_callback(self, callback: Callable):
+        """Agrega un callback para detecciones"""
+        self.detection_callbacks.append(callback)
+    
+    def enable_processor(self, processor_name: str):
+        """Habilita un procesador específico"""
+        if processor_name in self.processors:
+            if processor_name not in self.enabled_processors:
+                self.enabled_processors.append(processor_name)
+                logger.info(f"Procesador {processor_name} habilitado")
+    
+    def disable_processor(self, processor_name: str):
+        """Deshabilita un procesador específico"""
+        if processor_name in self.enabled_processors:
+            self.enabled_processors.remove(processor_name)
+            logger.info(f"Procesador {processor_name} deshabilitado")
+    
+    def get_system_info(self) -> Dict[str, Any]:
+        """Obtiene información del sistema"""
+        return {
+            "active": self.active,
+            "camera_index": self.camera_index,
+            "frame_rate": self.frame_rate,
+            "enabled_processors": self.enabled_processors,
+            "available_processors": list(self.processors.keys()),
+            "processing_stats": self.processing_stats.copy(),
+            "opencv_version": cv2.__version__
+        }
+    
+    def capture_image(self, filename: str = None) -> bool:
+        """Captura una imagen del frame actual"""
+        try:
+            if self.current_frame is None:
+                return False
+            
+            if filename is None:
+                filename = f"stark_capture_{int(time.time())}.jpg"
+            
+            cv2.imwrite(filename, self.current_frame)
+            logger.info(f"Imagen capturada: {filename}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error capturando imagen: {e}")
+            return False
+    
+    def process_image_file(self, image_path: str) -> List[DetectedObject]:
+        """Procesa una imagen desde archivo"""
+        try:
+            image = cv2.imread(image_path)
+            if image is None:
+                logger.error(f"No se pudo cargar la imagen: {image_path}")
+                return []
+            
+            all_detections = []
+            
+            for processor_name in self.enabled_processors:
+                if processor_name in self.processors:
+                    processor = self.processors[processor_name]
+                    detections = processor.process_frame(image)
+                    all_detections.extend(detections)
+            
+            logger.info(f"Procesada imagen {image_path}: {len(all_detections)} objetos detectados")
+            return all_detections
+            
+        except Exception as e:
+            logger.error(f"Error procesando imagen: {e}")
+            return []
+
+# Función principal para crear el sistema de visión
+def create_vision_system(camera_index: int = 0) -> StarkVisionSystem:
+    """Crea y configura el sistema de visión STARK"""
+    return StarkVisionSystem(camera_index)
+
+# Función de prueba
+def test_vision_system():
+    """Prueba básica del sistema de visión"""
+    vision = create_vision_system()
+    
+    def detection_handler(detections, frame):
+        print(f"Detectados {len(detections)} objetos")
+        for detection in detections:
+            print(f"  - {detection.class_name} (confianza: {detection.confidence:.2f})")
+    
+    vision.add_detection_callback(detection_handler)
+    
+    print("Iniciando sistema de visión...")
+    if vision.start_processing():
+        print("Sistema activo. Presiona Ctrl+C para detener.")
+        try:
+            time.sleep(10)  # Ejecutar por 10 segundos
+        except KeyboardInterrupt:
+            pass
+        finally:
+            vision.stop_processing()
+    else:
+        print("Error iniciando sistema de visión")
+
+if __name__ == "__main__":
+    test_vision_system()

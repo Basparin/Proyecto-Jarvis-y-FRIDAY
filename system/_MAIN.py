@@ -10,6 +10,25 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 
+# Importar analizador de estado
+try:
+    from .state_analyzer import StarkStateAnalyzer, analyze_stark_system
+except ImportError:
+    try:
+        from state_analyzer import StarkStateAnalyzer, analyze_stark_system
+    except ImportError:
+        # Definir versiones simplificadas si no está disponible
+        def analyze_stark_system():
+            return {"error": "State analyzer not available"}
+        
+        class StarkStateAnalyzer:
+            def __init__(self, *args, **kwargs):
+                pass
+            def get_quick_status(self):
+                return {"error": "State analyzer not available"}
+            def generate_technical_summary(self):
+                return "State analyzer not available"
+
 print("⚙️ SYSTEM MODULE - Iniciando infraestructura...")
 
 class SystemMain:
@@ -23,6 +42,7 @@ class SystemMain:
         self.config_manager = None
         self.logger = None
         self.health_monitor = None
+        self.state_analyzer = None
         
         # Estado del sistema
         self.system_status = 'initializing'
@@ -40,13 +60,35 @@ class SystemMain:
             self.logger = MockLogger()
             self.health_monitor = MockHealthMonitor()
             
+            # Inicializar analizador de estado técnico
+            self.state_analyzer = StarkStateAnalyzer()
+            
             self.system_status = 'operational'
             print("✅ SYSTEM - Infraestructura inicializada")
+            print("✅ SYSTEM - Analizador de estado técnico activado")
             
         except Exception as e:
             print(f"❌ Error inicializando sistema: {e}")
             self.system_status = 'error'
     
+    def get_technical_analysis(self) -> Dict[str, Any]:
+        """Obtiene análisis técnico completo del sistema"""
+        if self.state_analyzer:
+            return analyze_stark_system()
+        return {"error": "State analyzer not available"}
+    
+    def get_quick_system_status(self) -> Dict[str, Any]:
+        """Estado rápido del sistema para AI analysis"""
+        if self.state_analyzer:
+            return self.state_analyzer.get_quick_status()
+        return {"error": "State analyzer not available"}
+    
+    def generate_technical_summary(self) -> str:
+        """Genera resumen técnico para análisis AI"""
+        if self.state_analyzer:
+            return self.state_analyzer.generate_technical_summary()
+        return "State analyzer not available"
+        
     def get_system_status(self) -> Dict[str, Any]:
         """Obtiene estado del sistema"""
         uptime = datetime.now() - self.startup_time

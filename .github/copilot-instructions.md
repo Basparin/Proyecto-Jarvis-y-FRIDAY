@@ -1,6 +1,13 @@
 # JARVIS AND FRIDAY SYSTEMs
 USAR SIEMPRE COMANDOS PARA POWERSHELL
-ARCHIVO DE PROGRESO: STARK_PROGRESS.mod (Actualizar permanentemente)
+
+# ARCHIVOS IMPORTANTES PARA GITHUB COPILOT (VERIFICAR AL INICIO DE SESIÓN Y ACTUALIZAR AL FINAL DE SESIÓN)
+**STARK_PROGRESS.md** - Seguimiento de progreso
+**STARK_SYSTEM_STATE.json** - Estado técnico del sistema
+**state_analyzer.py** - Analizador para análisis AI eficiente
+**STARK_ACTION_PLAN.md** - 
+**autoprogrammer_agent.py** - 
+
 Sugerir cambios a copilot-instrucions.md cuando se requieran cambios.
 
 ## MISIÓN STARK INDUSTRIES

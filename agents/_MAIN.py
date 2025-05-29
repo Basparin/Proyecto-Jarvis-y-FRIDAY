@@ -10,6 +10,23 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 
+# Importar agentes especializados
+try:
+    from autoprogrammer_agent import StarkAutoprogrammerAgent, activate_autoprogrammer_agent
+    from autoprogrammer_brain import AutoprogrammerBrain
+    from autoprogrammer_analyzer import AutoprogrammerAnalyzer
+    from autoprogrammer_converter import AutoprogrammerConverter
+    from autoprogrammer_creator import AutoprogrammerCreator
+    from autoprogrammer_optimizer import AutoprogrammerOptimizer
+    from autoprogrammer_reviewer import AutoprogrammerReviewer
+    from autoprogrammer_coordinator import AutoprogrammerCoordinator
+    from integrator_agent import IntegratorAgent
+    from task_manager import TaskManager
+except ImportError as e:
+    print(f"⚠️ Import warning: {e}")
+    StarkAutoprogrammerAgent = None
+    activate_autoprogrammer_agent = None
+
 print("🤖 AGENTS MODULE - Iniciando coordinación...")
 
 class AgentsMain:
@@ -22,7 +39,8 @@ class AgentsMain:
         self.available_agents = {
             'JARVIS': 'Advanced AI Assistant',
             'FRIDAY': 'Tactical Analysis AI', 
-            'COPILOT': 'Code Optimization AI'
+            'COPILOT': 'Code Optimization AI',
+            'AUTOPROGRAMMER': 'Autoprogramming Specialist'
         }
         
         # Estado de coordinación
@@ -30,6 +48,7 @@ class AgentsMain:
         self.agent_coordinator = None
         self.task_manager = None
         self.decision_engine = None
+        self.autoprogrammer_agent = None
         
         # Inicializar coordinación
         self._initialize_coordination()
@@ -41,6 +60,11 @@ class AgentsMain:
             self.agent_coordinator = MockAgentCoordinator()
             self.task_manager = MockTaskManager()
             self.decision_engine = MockDecisionEngine()
+            
+            # Inicializar agente de autoprogramación
+            if activate_autoprogrammer_agent:
+                self.autoprogrammer_agent = activate_autoprogrammer_agent()
+                print("🤖 AUTOPROGRAMMER AGENT - Integrado al sistema")
             
             self.coordination_active = True
             print("✅ AGENTS - Coordinación inicializada")
@@ -84,7 +108,8 @@ class AgentsMain:
             'agent_health': {
                 'JARVIS': 'operational',
                 'FRIDAY': 'operational', 
-                'COPILOT': 'operational'
+                'COPILOT': 'operational',
+                'AUTOPROGRAMMER': 'operational' if self.autoprogrammer_agent else 'offline'
             },
             'coordination_capabilities': [
                 'Multi-agent task coordination',
@@ -115,6 +140,32 @@ class AgentsMain:
         else:
             print("❌ Test de coordinación falló")
             return {'status': 'failed', 'message': 'Coordination issues detected'}
+    
+    def get_autoprogrammer_status(self) -> Dict[str, Any]:
+        """Obtiene estado del agente de autoprogramación"""
+        if self.autoprogrammer_agent:
+            return self.autoprogrammer_agent.get_status_report()
+        return {"error": "Autoprogrammer agent not available"}
+    
+    def execute_autoprogramming_task(self) -> Dict[str, Any]:
+        """Ejecuta la siguiente tarea de autoprogramación"""
+        if not self.autoprogrammer_agent:
+            return {"error": "Autoprogrammer agent not available"}
+        
+        next_task = self.autoprogrammer_agent.get_next_task()
+        if next_task:
+            print(f"🚀 AUTOPROGRAMMER - Ejecutando: {next_task['component']}")
+            result = self.autoprogrammer_agent.execute_task(next_task)
+            print(f"📊 AUTOPROGRAMMER - Resultado: {result['status']}")
+            return result
+        else:
+            return {"status": "NO_TASKS", "message": "No hay tareas de autoprogramación pendientes"}
+    
+    def get_autoprogramming_priorities(self) -> List[str]:
+        """Obtiene las prioridades de autoprogramación"""
+        if self.autoprogrammer_agent:
+            return self.autoprogrammer_agent.priorities
+        return []
 
 # Componentes mock para coordinación
 class MockAgentCoordinator:

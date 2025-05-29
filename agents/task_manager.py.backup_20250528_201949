@@ -1,0 +1,808 @@
+"""
+STARK INDUSTRIES - Task Manager
+Gestor avanzado de tareas para coordinación de agentes
+Implementación real con priorización inteligente y distribución automática
+"""
+
+import threading
+import time
+import uuid
+import json
+import os
+from typing import Dict, List, Any, Optional, Callable, Union
+from datetime import datetime, timedelta
+from dataclasses import dataclass, asdict
+from enum import Enum
+from abc import ABC, abstractmethod
+import logging
+import heapq
+from collections import defaultdict, deque
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class TaskStatus(Enum):
+    """Estados de las tareas"""
+    PENDING = "pending"
+    ASSIGNED = "assigned"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+    PAUSED = "paused"
+
+class TaskPriority(Enum):
+    """Prioridades de tareas"""
+    CRITICAL = 1
+    HIGH = 2
+    MEDIUM = 3
+    LOW = 4
+    BACKGROUND = 5
+
+class TaskType(Enum):
+    """Tipos de tareas"""
+    ANALYSIS = "analysis"
+    SYNTHESIS = "synthesis"
+    COMMUNICATION = "communication"
+    MONITORING = "monitoring"
+    OPTIMIZATION = "optimization"
+    LEARNING = "learning"
+    COORDINATION = "coordination"
+    EMERGENCY = "emergency"
+
+@dataclass
+class TaskRequirements:
+    """Requisitos para ejecutar una tarea"""
+    required_capabilities: List[str]
+    required_resources: Dict[str, Any]
+    min_agent_level: int
+    estimated_duration: float  # en segundos
+    max_retries: int = 3
+    timeout: float = 300.0  # 5 minutos por defecto
+
+@dataclass
+class TaskResult:
+    """Resultado de ejecución de tarea"""
+    task_id: str
+    success: bool
+    result_data: Any
+    execution_time: float
+    agent_id: str
+    timestamp: datetime
+    error_message: Optional[str] = None
+    performance_metrics: Dict[str, Any] = None
+
+@dataclass
+class Task:
+    """Definición de tarea completa"""
+    task_id: str
+    name: str
+    description: str
+    task_type: TaskType
+    priority: TaskPriority
+    status: TaskStatus
+    requirements: TaskRequirements
+    payload: Dict[str, Any]
+    created_at: datetime
+    scheduled_at: Optional[datetime]
+    assigned_agent: Optional[str]
+    dependencies: List[str]  # IDs de tareas dependientes
+    callback: Optional[Callable] = None
+    progress: float = 0.0
+    retry_count: int = 0
+    last_update: Optional[datetime] = None
+    execution_history: List[Dict[str, Any]] = None
+    
+    def __post_init__(self):
+        if self.execution_history is None:
+            self.execution_history = []
+
+class Agent(ABC):
+    """Interfaz abstracta para agentes"""
+    
+    @abstractmethod
+    def get_agent_id(self) -> str:
+        pass
+    
+    @abstractmethod
+    def get_capabilities(self) -> List[str]:
+        pass
+    
+    @abstractmethod
+    def get_current_load(self) -> float:
+        pass
+    
+    @abstractmethod
+    def can_execute_task(self, task: Task) -> bool:
+        pass
+    
+    @abstractmethod
+    def execute_task(self, task: Task) -> TaskResult:
+        pass
+
+class StarkAgent(Agent):
+    """Implementación base de agente STARK"""
+    
+    def __init__(self, agent_id: str, capabilities: List[str], max_concurrent_tasks: int = 3):
+        self.agent_id = agent_id
+        self.capabilities = capabilities
+        self.max_concurrent_tasks = max_concurrent_tasks
+        self.current_tasks = {}
+        self.completed_tasks = 0
+        self.failed_tasks = 0
+        self.total_execution_time = 0.0
+        self.lock = threading.Lock()
+        
+        logger.info(f"🤖 Agente {agent_id} inicializado con capacidades: {capabilities}")
+    
+    def get_agent_id(self) -> str:
+        return self.agent_id
+    
+    def get_capabilities(self) -> List[str]:
+        return self.capabilities.copy()
+    
+    def get_current_load(self) -> float:
+        """Retorna carga actual como porcentaje"""
+        with self.lock:
+            return len(self.current_tasks) / self.max_concurrent_tasks
+    
+    def can_execute_task(self, task: Task) -> bool:
+        """Verifica si puede ejecutar la tarea"""
+        with self.lock:
+            # Verificar capacidad
+            if len(self.current_tasks) >= self.max_concurrent_tasks:
+                return False
+            
+            # Verificar capacidades requeridas
+            required_caps = task.requirements.required_capabilities
+            if not all(cap in self.capabilities for cap in required_caps):
+                return False
+            
+            return True
+    
+    def execute_task(self, task: Task) -> TaskResult:
+        """Ejecuta la tarea (implementación base)"""
+        start_time = time.time()
+        
+        try:
+            with self.lock:
+                self.current_tasks[task.task_id] = task
+            
+            # Simular trabajo (cada agente especializado sobrescribirá esto)
+            result_data = self._process_task(task)
+            
+            execution_time = time.time() - start_time
+            
+            with self.lock:
+                del self.current_tasks[task.task_id]
+                self.completed_tasks += 1
+                self.total_execution_time += execution_time
+            
+            return TaskResult(
+                task_id=task.task_id,
+                success=True,
+                result_data=result_data,
+                execution_time=execution_time,
+                agent_id=self.agent_id,
+                timestamp=datetime.now(),
+                performance_metrics={
+                    "efficiency": 1.0 / execution_time if execution_time > 0 else 1.0
+                }
+            )
+            
+        except Exception as e:
+            execution_time = time.time() - start_time
+            
+            with self.lock:
+                if task.task_id in self.current_tasks:
+                    del self.current_tasks[task.task_id]
+                self.failed_tasks += 1
+            
+            return TaskResult(
+                task_id=task.task_id,
+                success=False,
+                result_data=None,
+                execution_time=execution_time,
+                agent_id=self.agent_id,
+                timestamp=datetime.now(),
+                error_message=str(e)
+            )
+    
+    def _process_task(self, task: Task) -> Any:
+        """Procesa la tarea específica (override en agentes especializados)"""
+        # Implementación base - solo simular trabajo
+        time.sleep(0.1)
+        return {"status": "completed", "message": f"Task {task.name} processed by {self.agent_id}"}
+    
+    def get_performance_stats(self) -> Dict[str, Any]:
+        """Estadísticas de rendimiento del agente"""
+        with self.lock:
+            total_tasks = self.completed_tasks + self.failed_tasks
+            success_rate = (self.completed_tasks / total_tasks) if total_tasks > 0 else 0.0
+            avg_execution_time = (self.total_execution_time / self.completed_tasks) if self.completed_tasks > 0 else 0.0
+            
+            return {
+                "agent_id": self.agent_id,
+                "current_load": self.get_current_load(),
+                "total_tasks": total_tasks,
+                "completed_tasks": self.completed_tasks,
+                "failed_tasks": self.failed_tasks,
+                "success_rate": success_rate,
+                "average_execution_time": avg_execution_time,
+                "current_active_tasks": len(self.current_tasks)
+            }
+
+class JarvisAgent(StarkAgent):
+    """Agente JARVIS especializado"""
+    
+    def __init__(self):
+        super().__init__(
+            agent_id="JARVIS",
+            capabilities=[
+                "analysis", "coordination", "strategic_planning", 
+                "communication", "learning", "optimization"
+            ],
+            max_concurrent_tasks=5
+        )
+    
+    def _process_task(self, task: Task) -> Any:
+        """Procesamiento especializado de JARVIS"""
+        if task.task_type == TaskType.ANALYSIS:
+            return self._sophisticated_analysis(task)
+        elif task.task_type == TaskType.COORDINATION:
+            return self._coordinate_systems(task)
+        elif task.task_type == TaskType.STRATEGIC_PLANNING:
+            return self._strategic_planning(task)
+        else:
+            return super()._process_task(task)
+    
+    def _sophisticated_analysis(self, task: Task) -> Dict[str, Any]:
+        """Análisis sofisticado estilo JARVIS"""
+        time.sleep(0.5)  # Simular análisis complejo
+        return {
+            "analysis_type": "sophisticated",
+            "insights": ["Pattern detected", "Optimization opportunity identified"],
+            "recommendations": ["Increase efficiency by 15%", "Implement predictive measures"],
+            "confidence": 0.92
+        }
+    
+    def _coordinate_systems(self, task: Task) -> Dict[str, Any]:
+        """Coordinación de sistemas"""
+        time.sleep(0.3)
+        return {
+            "coordination_status": "optimal",
+            "systems_synchronized": True,
+            "performance_improvement": "12%"
+        }
+    
+    def _strategic_planning(self, task: Task) -> Dict[str, Any]:
+        """Planificación estratégica"""
+        time.sleep(0.7)
+        return {
+            "strategy": "adaptive_optimization",
+            "timeline": "3_phases",
+            "expected_outcomes": ["Enhanced efficiency", "Reduced response time"]
+        }
+
+class FridayAgent(StarkAgent):
+    """Agente FRIDAY especializado"""
+    
+    def __init__(self):
+        super().__init__(
+            agent_id="FRIDAY",
+            capabilities=[
+                "monitoring", "emergency", "security", 
+                "rapid_response", "tactical_analysis"
+            ],
+            max_concurrent_tasks=4
+        )
+    
+    def _process_task(self, task: Task) -> Any:
+        """Procesamiento especializado de FRIDAY"""
+        if task.task_type == TaskType.MONITORING:
+            return self._tactical_monitoring(task)
+        elif task.task_type == TaskType.EMERGENCY:
+            return self._emergency_response(task)
+        else:
+            return super()._process_task(task)
+    
+    def _tactical_monitoring(self, task: Task) -> Dict[str, Any]:
+        """Monitoreo táctico estilo FRIDAY"""
+        time.sleep(0.2)  # Respuesta rápida
+        return {
+            "monitoring_status": "active",
+            "threats_detected": 0,
+            "system_integrity": "100%",
+            "response_time": "immediate"
+        }
+    
+    def _emergency_response(self, task: Task) -> Dict[str, Any]:
+        """Respuesta de emergencia"""
+        time.sleep(0.1)  # Respuesta ultra-rápida
+        return {
+            "emergency_status": "handled",
+            "response_time": "0.1s",
+            "actions_taken": ["System secured", "Threat neutralized"]
+        }
+
+class CopilotAgent(StarkAgent):
+    """Agente COPILOT especializado"""
+    
+    def __init__(self):
+        super().__init__(
+            agent_id="COPILOT",
+            capabilities=[
+                "optimization", "synthesis", "learning",
+                "code_analysis", "efficiency_enhancement"
+            ],
+            max_concurrent_tasks=6
+        )
+    
+    def _process_task(self, task: Task) -> Any:
+        """Procesamiento especializado de COPILOT"""
+        if task.task_type == TaskType.OPTIMIZATION:
+            return self._optimization_analysis(task)
+        elif task.task_type == TaskType.SYNTHESIS:
+            return self._code_synthesis(task)
+        else:
+            return super()._process_task(task)
+    
+    def _optimization_analysis(self, task: Task) -> Dict[str, Any]:
+        """Análisis de optimización"""
+        time.sleep(0.4)
+        return {
+            "optimization_type": "efficiency",
+            "improvements_found": 3,
+            "estimated_performance_gain": "18%",
+            "implementation_complexity": "medium"
+        }
+    
+    def _code_synthesis(self, task: Task) -> Dict[str, Any]:
+        """Síntesis de código"""
+        time.sleep(0.6)
+        return {
+            "synthesis_type": "adaptive",
+            "code_quality": "high",
+            "lines_generated": 127,
+            "test_coverage": "85%"
+        }
+
+class TaskScheduler:
+    """Planificador de tareas con algoritmos avanzados"""
+    
+    def __init__(self):
+        self.priority_queue = []  # heap para prioridades
+        self.scheduled_tasks = {}  # tareas programadas
+        self.dependency_graph = defaultdict(set)
+        self.lock = threading.Lock()
+        
+    def add_task(self, task: Task):
+        """Agrega tarea al planificador"""
+        with self.lock:
+            # Agregar a cola de prioridad
+            priority_value = task.priority.value + (task.scheduled_at.timestamp() if task.scheduled_at else 0)
+            heapq.heappush(self.priority_queue, (priority_value, task.created_at.timestamp(), task))
+            
+            # Actualizar grafo de dependencias
+            for dep_id in task.dependencies:
+                self.dependency_graph[dep_id].add(task.task_id)
+    
+    def get_next_task(self, agent_capabilities: List[str]) -> Optional[Task]:
+        """Obtiene la próxima tarea compatible"""
+        with self.lock:
+            available_tasks = []
+            
+            # Buscar tareas ejecutables
+            temp_queue = []
+            
+            while self.priority_queue:
+                priority_value, timestamp, task = heapq.heappop(self.priority_queue)
+                
+                # Verificar si es hora de ejecutar
+                if task.scheduled_at and task.scheduled_at > datetime.now():
+                    temp_queue.append((priority_value, timestamp, task))
+                    continue
+                
+                # Verificar dependencias
+                if self._dependencies_satisfied(task):
+                    # Verificar capacidades
+                    required_caps = task.requirements.required_capabilities
+                    if all(cap in agent_capabilities for cap in required_caps):
+                        # Restaurar cola
+                        for item in temp_queue:
+                            heapq.heappush(self.priority_queue, item)
+                        return task
+                
+                temp_queue.append((priority_value, timestamp, task))
+            
+            # Restaurar cola completa
+            for item in temp_queue:
+                heapq.heappush(self.priority_queue, item)
+            
+            return None
+    
+    def _dependencies_satisfied(self, task: Task) -> bool:
+        """Verifica si las dependencias están satisfechas"""
+        # En implementación real, verificaríamos el estado de las dependencias
+        return True  # Simplificado por ahora
+    
+    def task_completed(self, task_id: str):
+        """Marca tarea como completada para dependencias"""
+        with self.lock:
+            # Liberar dependencias
+            if task_id in self.dependency_graph:
+                del self.dependency_graph[task_id]
+
+class StarkTaskManager:
+    """
+    Gestor principal de tareas del sistema STARK
+    Coordina agentes, planifica tareas y optimiza la ejecución
+    """
+    
+    def __init__(self, data_path: str = "task_data"):
+        self.data_path = data_path
+        self.agents = {}
+        self.scheduler = TaskScheduler()
+        self.tasks = {}  # Todas las tareas por ID
+        self.active = False
+        self.management_thread = None
+        
+        # Estadísticas
+        self.stats = {
+            "total_tasks": 0,
+            "completed_tasks": 0,
+            "failed_tasks": 0,
+            "average_task_time": 0.0,
+            "agent_efficiency": 0.0,
+            "last_update": datetime.now()
+        }
+        
+        # Configuración
+        self.task_timeout = 300.0  # 5 minutos
+        self.max_retries = 3
+        self.cleanup_interval = 3600.0  # 1 hora
+        
+        # Lock para thread safety
+        self.lock = threading.Lock()
+        
+        # Callbacks
+        self.task_callbacks = {
+            "on_task_created": [],
+            "on_task_assigned": [],
+            "on_task_completed": [],
+            "on_task_failed": []
+        }
+        
+        self._ensure_data_directory()
+        self._initialize_default_agents()
+        
+        logger.info("📋 STARK Task Manager inicializado")
+    
+    def _ensure_data_directory(self):
+        """Asegura que el directorio de datos existe"""
+        if not os.path.exists(self.data_path):
+            os.makedirs(self.data_path)
+    
+    def _initialize_default_agents(self):
+        """Inicializa los agentes por defecto"""
+        self.agents["JARVIS"] = JarvisAgent()
+        self.agents["FRIDAY"] = FridayAgent()
+        self.agents["COPILOT"] = CopilotAgent()
+        
+        logger.info(f"Agentes inicializados: {list(self.agents.keys())}")
+    
+    def start_manager(self):
+        """Inicia el gestor de tareas"""
+        if self.active:
+            return
+        
+        self.active = True
+        self.management_thread = threading.Thread(target=self._management_loop)
+        self.management_thread.daemon = True
+        self.management_thread.start()
+        
+        logger.info("🚀 Task Manager iniciado")
+    
+    def stop_manager(self):
+        """Detiene el gestor"""
+        self.active = False
+        
+        if self.management_thread:
+            self.management_thread.join(timeout=2.0)
+        
+        logger.info("⏹️ Task Manager detenido")
+    
+    def create_task(self, name: str, description: str, task_type: TaskType,
+                   priority: TaskPriority, requirements: TaskRequirements,
+                   payload: Dict[str, Any], dependencies: List[str] = None,
+                   scheduled_at: datetime = None, callback: Callable = None) -> str:
+        """Crea una nueva tarea"""
+        
+        task_id = str(uuid.uuid4())
+        
+        task = Task(
+            task_id=task_id,
+            name=name,
+            description=description,
+            task_type=task_type,
+            priority=priority,
+            status=TaskStatus.PENDING,
+            requirements=requirements,
+            payload=payload,
+            created_at=datetime.now(),
+            scheduled_at=scheduled_at,
+            assigned_agent=None,
+            dependencies=dependencies or [],
+            callback=callback
+        )
+        
+        with self.lock:
+            self.tasks[task_id] = task
+            self.stats["total_tasks"] += 1
+        
+        self.scheduler.add_task(task)
+        
+        # Ejecutar callbacks
+        self._execute_callbacks("on_task_created", task)
+        
+        logger.info(f"Tarea creada: {name} ({task_id})")
+        return task_id
+    
+    def _management_loop(self):
+        """Bucle principal de gestión"""
+        last_cleanup = time.time()
+        
+        while self.active:
+            try:
+                current_time = time.time()
+                
+                # Asignar tareas disponibles
+                self._assign_available_tasks()
+                
+                # Verificar timeouts
+                self._check_task_timeouts()
+                
+                # Cleanup periódico
+                if current_time - last_cleanup > self.cleanup_interval:
+                    self._cleanup_completed_tasks()
+                    last_cleanup = current_time
+                
+                # Actualizar estadísticas
+                self._update_statistics()
+                
+                time.sleep(1.0)  # Verificar cada segundo
+                
+            except Exception as e:
+                logger.error(f"Error en management loop: {e}")
+                time.sleep(5.0)
+    
+    def _assign_available_tasks(self):
+        """Asigna tareas a agentes disponibles"""
+        for agent_id, agent in self.agents.items():
+            if agent.get_current_load() < 1.0:  # Agente tiene capacidad
+                task = self.scheduler.get_next_task(agent.get_capabilities())
+                
+                if task and agent.can_execute_task(task):
+                    self._assign_task_to_agent(task, agent)
+    
+    def _assign_task_to_agent(self, task: Task, agent: StarkAgent):
+        """Asigna una tarea específica a un agente"""
+        with self.lock:
+            task.status = TaskStatus.ASSIGNED
+            task.assigned_agent = agent.get_agent_id()
+            task.last_update = datetime.now()
+        
+        # Ejecutar en thread separado
+        execution_thread = threading.Thread(
+            target=self._execute_task_async,
+            args=(task, agent)
+        )
+        execution_thread.daemon = True
+        execution_thread.start()
+        
+        self._execute_callbacks("on_task_assigned", task)
+        logger.info(f"Tarea {task.name} asignada a {agent.get_agent_id()}")
+    
+    def _execute_task_async(self, task: Task, agent: StarkAgent):
+        """Ejecuta tarea de manera asíncrona"""
+        try:
+            with self.lock:
+                task.status = TaskStatus.IN_PROGRESS
+                task.last_update = datetime.now()
+            
+            # Ejecutar tarea
+            result = agent.execute_task(task)
+            
+            with self.lock:
+                if result.success:
+                    task.status = TaskStatus.COMPLETED
+                    self.stats["completed_tasks"] += 1
+                    self._execute_callbacks("on_task_completed", task)
+                else:
+                    task.status = TaskStatus.FAILED
+                    self.stats["failed_tasks"] += 1
+                    self._execute_callbacks("on_task_failed", task)
+                
+                task.last_update = datetime.now()
+                
+                # Agregar a historial
+                task.execution_history.append({
+                    "timestamp": result.timestamp.isoformat(),
+                    "agent_id": result.agent_id,
+                    "success": result.success,
+                    "execution_time": result.execution_time,
+                    "error": result.error_message
+                })
+            
+            # Ejecutar callback de la tarea si existe
+            if task.callback:
+                try:
+                    task.callback(result)
+                except Exception as e:
+                    logger.error(f"Error en callback de tarea: {e}")
+            
+            # Notificar al scheduler
+            if result.success:
+                self.scheduler.task_completed(task.task_id)
+            
+        except Exception as e:
+            logger.error(f"Error ejecutando tarea {task.task_id}: {e}")
+            with self.lock:
+                task.status = TaskStatus.FAILED
+                self.stats["failed_tasks"] += 1
+    
+    def _check_task_timeouts(self):
+        """Verifica tareas que han excedido el timeout"""
+        current_time = datetime.now()
+        
+        with self.lock:
+            for task in self.tasks.values():
+                if task.status == TaskStatus.IN_PROGRESS:
+                    if task.last_update:
+                        time_diff = (current_time - task.last_update).total_seconds()
+                        if time_diff > task.requirements.timeout:
+                            logger.warning(f"Tarea {task.task_id} ha excedido timeout")
+                            task.status = TaskStatus.FAILED
+                            self.stats["failed_tasks"] += 1
+    
+    def _cleanup_completed_tasks(self):
+        """Limpia tareas completadas antiguas"""
+        cutoff_time = datetime.now() - timedelta(hours=24)
+        
+        with self.lock:
+            tasks_to_remove = []
+            for task_id, task in self.tasks.items():
+                if (task.status in [TaskStatus.COMPLETED, TaskStatus.FAILED] and
+                    task.last_update and task.last_update < cutoff_time):
+                    tasks_to_remove.append(task_id)
+            
+            for task_id in tasks_to_remove:
+                del self.tasks[task_id]
+            
+            if tasks_to_remove:
+                logger.info(f"Limpiadas {len(tasks_to_remove)} tareas antigas")
+    
+    def _update_statistics(self):
+        """Actualiza estadísticas del sistema"""
+        with self.lock:
+            total_completed = sum(agent.completed_tasks for agent in self.agents.values())
+            total_time = sum(agent.total_execution_time for agent in self.agents.values())
+            
+            if total_completed > 0:
+                self.stats["average_task_time"] = total_time / total_completed
+            
+            # Eficiencia promedio de agentes
+            efficiencies = []
+            for agent in self.agents.values():
+                stats = agent.get_performance_stats()
+                efficiencies.append(stats["success_rate"])
+            
+            if efficiencies:
+                self.stats["agent_efficiency"] = sum(efficiencies) / len(efficiencies)
+            
+            self.stats["last_update"] = datetime.now()
+    
+    def _execute_callbacks(self, event_type: str, task: Task):
+        """Ejecuta callbacks para eventos de tareas"""
+        for callback in self.task_callbacks.get(event_type, []):
+            try:
+                callback(task)
+            except Exception as e:
+                logger.error(f"Error en callback {event_type}: {e}")
+    
+    def add_callback(self, event_type: str, callback: Callable):
+        """Agrega callback para eventos de tareas"""
+        if event_type in self.task_callbacks:
+            self.task_callbacks[event_type].append(callback)
+    
+    def get_task_status(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """Obtiene el estado de una tarea"""
+        with self.lock:
+            if task_id in self.tasks:
+                task = self.tasks[task_id]
+                return {
+                    "task_id": task.task_id,
+                    "name": task.name,
+                    "status": task.status.value,
+                    "progress": task.progress,
+                    "assigned_agent": task.assigned_agent,
+                    "created_at": task.created_at.isoformat(),
+                    "last_update": task.last_update.isoformat() if task.last_update else None,
+                    "execution_history": task.execution_history
+                }
+        return None
+    
+    def get_system_stats(self) -> Dict[str, Any]:
+        """Estadísticas del sistema"""
+        agent_stats = {}
+        for agent_id, agent in self.agents.items():
+            agent_stats[agent_id] = agent.get_performance_stats()
+        
+        with self.lock:
+            return {
+                "task_manager_stats": self.stats.copy(),
+                "agent_stats": agent_stats,
+                "active_tasks": len([t for t in self.tasks.values() 
+                                   if t.status in [TaskStatus.ASSIGNED, TaskStatus.IN_PROGRESS]]),
+                "pending_tasks": len([t for t in self.tasks.values() 
+                                    if t.status == TaskStatus.PENDING])
+            }
+    
+    def cancel_task(self, task_id: str) -> bool:
+        """Cancela una tarea"""
+        with self.lock:
+            if task_id in self.tasks:
+                task = self.tasks[task_id]
+                if task.status in [TaskStatus.PENDING, TaskStatus.ASSIGNED]:
+                    task.status = TaskStatus.CANCELLED
+                    task.last_update = datetime.now()
+                    logger.info(f"Tarea {task_id} cancelada")
+                    return True
+        return False
+
+# Función principal para crear el gestor de tareas
+def create_task_manager(data_path: str = "task_data") -> StarkTaskManager:
+    """Crea y configura el gestor de tareas STARK"""
+    return StarkTaskManager(data_path)
+
+# Función de prueba
+def test_task_manager():
+    """Prueba básica del gestor de tareas"""
+    manager = create_task_manager()
+    manager.start_manager()
+    
+    # Crear tarea de prueba
+    requirements = TaskRequirements(
+        required_capabilities=["analysis"],
+        required_resources={},
+        min_agent_level=1,
+        estimated_duration=2.0
+    )
+    
+    task_id = manager.create_task(
+        name="Test Analysis",
+        description="Tarea de prueba para análisis",
+        task_type=TaskType.ANALYSIS,
+        priority=TaskPriority.HIGH,
+        requirements=requirements,
+        payload={"data": "test_data"}
+    )
+    
+    print(f"Tarea creada: {task_id}")
+    
+    # Esperar procesamiento
+    time.sleep(3)
+    
+    # Verificar estado
+    status = manager.get_task_status(task_id)
+    print(f"Estado de tarea: {status}")
+    
+    # Estadísticas
+    stats = manager.get_system_stats()
+    print(f"Estadísticas: {stats}")
+    
+    manager.stop_manager()
+
+if __name__ == "__main__":
+    test_task_manager()
